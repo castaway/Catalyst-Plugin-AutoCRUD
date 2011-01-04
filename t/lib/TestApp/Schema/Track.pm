@@ -32,12 +32,12 @@ __PACKAGE__->set_primary_key("id");
 __PACKAGE__->belongs_to(
   "parent_album" =>
   "TestApp::Schema::Album",
-  { id => "album_id" }
+  { "foreign.id" => "self.album_id" }
 );
 __PACKAGE__->belongs_to(
   "copyright_id" =>
   "TestApp::Schema::Copyright",
-  { id => "copyright_id" },
+  { "foreign.id" => "self.copyright_id" },
 );
 
 

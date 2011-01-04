@@ -25,8 +25,12 @@ __PACKAGE__->add_columns(
   { data_type => "int", is_foreign_key => 1, is_nullable => 0, size => undef },
 );
 __PACKAGE__->set_primary_key("id");
-__PACKAGE__->belongs_to("artist_id", "TestApp::Schema::Artist", { id => "artist_id" });
-__PACKAGE__->might_have("sleeve_notes", "TestApp::Schema::SleeveNotes", { 'foreign.album_id' => 'self.id' });
+__PACKAGE__->belongs_to("artist_id", "TestApp::Schema::Artist", { 'foreign.id' => "self.artist_id" });
+__PACKAGE__->might_have("sleeve_notes", 
+                        "TestApp::Schema::SleeveNotes", 
+#                        { 'foreign.album_id' => 'self.id' }
+                        'album_id'
+    );
 __PACKAGE__->has_many(
   "tracks",
   "TestApp::Schema::Track",

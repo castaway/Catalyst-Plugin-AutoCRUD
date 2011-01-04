@@ -24,7 +24,7 @@ my $expected = {
     'table_info' => {
         'AutoCRUD::DBIC::Copyright' => {
             'mfks'    => { 'tracks' => 'Tracks' },
-            'pk'      => 'id',
+            'pk'      => ['id'],
             'moniker' => 'Copyright',
             'col_order' => [ 'id', 'rights owner', 'copyright_year' ],
             'path'      => 'copyright',
@@ -61,7 +61,7 @@ my $expected = {
     'tab_order' => { 'AutoCRUD::DBIC::Copyright' => 1 },
     'main'      => {
         'mfks'    => { 'tracks' => 'Tracks' },
-        'pk'      => 'id',
+        'pk'      => ['id'],
         'moniker' => 'Copyright',
         'col_order' => [ 'id', 'rights owner', 'copyright_year' ],
         'path'      => 'copyright',

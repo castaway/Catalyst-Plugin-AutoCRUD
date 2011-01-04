@@ -174,60 +174,98 @@ sub _build_table_info {
             next;
         }
 
-        # if the self column in the relation condition is a FK, then the
+        # if the self column(s) in the relation condition is a FK, then the
         # relation type is belongs_to, otherwise it's has_one/might_have
 
-        (my $self_col = (values %{$rel_info->{cond}})[0]) =~ s/^self\.//;
-        my $col_info = $source->column_info($self_col);
+        ## Need to run this for all the self. keys in the condition (multi-pks)
+#        (my $self_col = (values %{$rel_info->{cond}})[0]) =~ s/^self\.//;
+        my %rel_cond = %{ $rel_info->{cond} };
+        my %self_cols = map { s/^self\.//; $_ => $source->column_info($_) } 
+                         grep { /^self\./ } (values %rel_cond);
+#        my $col_info = $source->column_info($self_col);
 
-        if (exists $col_info->{is_foreign_key} and $col_info->{is_foreign_key} == 1) {
+        my $is_fk = 1;
+        foreach my $col_info (values %self_cols) {
+            $is_fk = 0 if(!(exists $col_info->{is_foreign_key} and $col_info->{is_foreign_key} == 1));
+        }
+
+#        if (exists $col_info->{is_foreign_key} and $col_info->{is_foreign_key} == 1) {
+        ## Hmm, wonder what masked_col is used for.. 
+        if ($is_fk) {
             # is belongs_to type relation
             # need to deal with custom accessor name
             $fks{$r} = $rel_info;
-            @cols = grep {$_ ne $self_col} @cols;
-            $ti->{cols}->{$r}->{masked_col} = $self_col;
+            @cols = grep {!exists $self_cols{$_}} @cols;
+            ## ??
+            $ti->{cols}->{$r}->{masked_col} = [ keys %self_cols ];
+            my @foreign = keys %rel_cond;
+            foreach my $fcol (@foreign) {
+                $fcol =~ s/^foreign\.//; 
+            }
+
+            $ti->{cols}->{$r}->{foreign_col} = \@foreign;
 
             # emit warning about belongs_to relations which are is_nullable
             # but that do not have a join_type set
-            if (exists $col_info->{is_nullable} and $col_info->{is_nullable} == 1
+            foreach my $col_info (values %self_cols) {
+                if (exists $col_info->{is_nullable} and $col_info->{is_nullable} == 1
                     and !exists $rel_info->{attrs}->{join_type}) {
-                $c->log->error( sprintf(
-                    'AutoCRUD CAUTION!: Relation [%s]->[%s] is of type belongs_to '.
-                    'and is_nullable, but has no join_type set. You will not see '.
-                    'all your data!', $source->source_name, $r
-                ));
+                    $c->log->error( sprintf(
+                                        'AutoCRUD CAUTION!: Relation [%s]->[%s] is of type belongs_to '.
+                                        'and is_nullable, but has no join_type set. You will not see '.
+                                        'all your data!', $source->source_name, $r
+                                    ));
+                }
             }
 
             # emit warning if belongs_to is using a column which does not have
             # an inflator set. this is caused by belongs_to being issued
             # before [the last] add_column in the result source.
-            if ($ti->{cols}->{$r}->{masked_col} eq $r
-                    and !exists $col_info->{_inflate_info}) {
-                $c->log->error( sprintf(
-                    'AutoCRUD CAUTION!: Relation [%s]->[%s] is of type belongs_to '.
-                    'but the column [%s] does not have a row inflator. This means '.
-                    'you will not see related row data. Likely cause is belongs_to '.
-                    'being issued before add_column in your result source definition.',
-                        $source->source_name, $r, $self_col
-                ));
+            foreach my $masked_col (@{ $ti->{cols}->{$r}->{masked_col} }) {
+                if ($masked_col eq $r
+                    and !exists $self_cols{$masked_col}->{_inflate_info}) {
+                    $c->log->error( sprintf(
+              'AutoCRUD CAUTION!: Relation [%s]->[%s] is of type belongs_to '.
+              'but the column [%s] does not have a row inflator. This means '.
+              'you will not see related row data. Likely cause is belongs_to '.
+              'being issued before add_column in your result source definition.',
+               $source->source_name, $r, $masked_col
+                                    ));
+                }
             }
         }
         else {
             # is has_one or might_have type relation
             # need to grab the FK from the related source
             $sfks{$r} = $rel_info;
-            (my $foreign_col = (keys %{$rel_info->{cond}})[0]) =~ s/^foreign\.//;
-            $ti->{cols}->{$r}->{foreign_col} = $foreign_col;
+
+            my @foreign_cols = ();
+            foreach my $key (keys %{ $rel_info->{cond} }) {
+                my $value = $rel_info->{cond}{$key};
+                $value =~ s/^self\.//;
+                $key =~ s/^foreign\.//;
+                push @foreign_cols, $key; 
+                $ti->{cols}{$value}{foreign_col} = $key;
+            }
+
+#            (my $foreign_col = (keys %{$rel_info->{cond}})[0]) =~ s/^foreign\.//;
+#            $ti->{cols}->{$r}->{foreign_col} = $foreign_col;
+            $ti->{cols}->{$r}->{foreign_col} = \@foreign_cols;
 
             # emit warning about belongs_to relations which refer to columns
             # without is_foreign_key set (triggers discovery as has_one or
             # might_have)
-            if (not scalar grep {$_ eq $self_col} $source->primary_columns) {
+            my $not_pk = 1;
+            foreach my $self_col ( keys %self_cols) {
+                $not_pk = 0 if(grep {$_ eq $self_col} $source->primary_columns);
+            }
+#            if (not scalar grep {$_ eq $self_col} $source->primary_columns) {
+            if ($not_pk) {
                 $c->log->error( sprintf(
                     'AutoCRUD CAUTION!: Relation [%s]->[%s] is of type belongs_to '.
                     'but is_foreign_key has not been set on column [%s]. You will '.
                     'have incorrect column data from AutoCRUD until this is fixed!',
-                        $source->source_name, $r, $self_col
+                        $source->source_name, $r, join(':', keys %self_cols)
                 ));
             }
         }
@@ -251,10 +289,14 @@ sub _build_table_info {
         }
     }
 
-    $ti->{pk} = ($source->primary_columns)[0];
+#    $ti->{pk} = ($source->primary_columns)[0];
+    ## This might be a lot easier, if instead of extracting out "pk" as a separate entity
+    ## We just make it a flag on the col info data. 
+    $ti->{pk} = [$source->primary_columns];
     $ti->{col_order} = [
-        $ti->{pk},                                           # primary key
-        (grep {!exists $fks{$_} and $_ ne $ti->{pk}} @cols), # ordinary cols
+        @{ $ti->{pk} },                                           # primary key
+#        (grep {!exists $fks{$_} and $_ ne $ti->{pk}} @cols), # ordinary cols
+        ( map { my $c = $_; !$fks{$c} && !(grep {$c eq $_ } @{ $ti->{pk} }) ? $c : () } @cols),
     ];
 
     # consider table columns
@@ -283,26 +325,29 @@ sub _build_table_info {
     # and FIXME do the same for the FKs which are masking hidden cols
     foreach my $col (keys %fks) {
         next unless exists $ti->{cols}->{$col}->{masked_col};
-        my $info = $source->column_info($ti->{cols}->{$col}->{masked_col});
-        next unless defined $info;
+        foreach my $masked_col (@{ $ti->{cols}->{$col}->{masked_col} }) {
+#            my $info = $source->column_info($ti->{cols}->{$col}->{masked_col});
+            my $info = $source->column_info($masked_col);
+            next unless defined $info;
 
-        $ti->{cols}->{$col} = {
-            %{$ti->{cols}->{$col}},
-            heading      => _2title($col),
-            editable     => ($info->{is_auto_increment} ? 0 : 1),
-            required     => ((exists $info->{is_nullable}
-                                 and $info->{is_nullable} == 0) ? 1 : 0),
-        };
+            $ti->{cols}->{$col} = {
+                %{$ti->{cols}->{$col}},
+                heading      => _2title($col),
+                editable     => ($info->{is_auto_increment} ? 0 : 1),
+                required     => ((exists $info->{is_nullable}
+                                  and $info->{is_nullable} == 0) ? 1 : 0),
+            };
 
-        $ti->{cols}->{$col}->{default_value} = $info->{default_value}
-            if ($info->{default_value} and $ti->{cols}->{$col}->{editable});
+            $ti->{cols}->{$col}->{default_value} = $info->{default_value}
+                if ($info->{default_value} and $ti->{cols}->{$col}->{editable});
+            
+            $ti->{cols}->{$col}->{extjs_xtype} = $xtype_for{ lc($info->{data_type}) }
+                if (exists $info->{data_type} and exists $xtype_for{ lc($info->{data_type}) });
 
-        $ti->{cols}->{$col}->{extjs_xtype} = $xtype_for{ lc($info->{data_type}) }
-            if (exists $info->{data_type} and exists $xtype_for{ lc($info->{data_type}) });
-
-        $ti->{cols}->{$col}->{extjs_xtype} = 'textfield'
-            if !exists $ti->{cols}->{$col}->{extjs_xtype}
+            $ti->{cols}->{$col}->{extjs_xtype} = 'textfield'
+                if !exists $ti->{cols}->{$col}->{extjs_xtype}
                 and defined $info->{size} and $info->{size} <= 40;
+        }
     }
 
     # extra data for foreign key columns
@@ -320,7 +365,7 @@ sub _build_table_info {
 
         # we want to see relation columns unless they're the same as our PK
         # (which has already been added to the col_order list)
-        push @{$ti->{col_order}}, $col if $col ne $ti->{pk};
+        push @{$ti->{col_order}}, $col if( ! grep { $_ eq $col } @{ $ti->{pk} });
 
         if (exists $sfks{$col}) {
         # has_one or might_have cols are reverse relations, so pass hint

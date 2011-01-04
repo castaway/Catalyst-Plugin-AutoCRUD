@@ -21,7 +21,7 @@ __PACKAGE__->add_columns(
   { data_type => "int", is_foreign_key => 1, is_nullable => 0, size => undef },
 );
 __PACKAGE__->set_primary_key("id");
-__PACKAGE__->belongs_to("album_id", "TestApp::Schema::Album", { id => "album_id" });
+__PACKAGE__->belongs_to("album_id", "TestApp::Schema::Album", { "foreign.id" => "self.album_id" });
 
 # Created by DBIx::Class::Schema::Loader v0.04999_05 @ 2008-08-03 20:38:57
 # DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:KHS2SrT7ZnxECLzSP58k3Q

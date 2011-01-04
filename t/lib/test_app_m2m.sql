@@ -30,16 +30,16 @@ INSERT INTO album (id,title,recorded,deleted) VALUES (4, 'Pop Songs', '2007-05-3
 INSERT INTO album (id,title,recorded,deleted) VALUES (5, 'Greatest Hits', '2002-05-21', 'false');
 
 CREATE TABLE artist_album (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
     artist_id int REFERENCES artist(id) NOT NULL,
-    album_id int REFERENCES album(id) NOT NULL
+    album_id int REFERENCES album(id) NOT NULL,
+    PRIMARY KEY (artist_id, album_id)
 );
 
-INSERT INTO artist_album (id,artist_id,album_id) VALUES (1, 1, 1);
+INSERT INTO artist_album (artist_id,album_id) VALUES (1, 1);
 
-INSERT INTO artist_album (id,artist_id,album_id) VALUES (2, 1, 2);
+INSERT INTO artist_album (artist_id,album_id) VALUES (1, 2);
 
-INSERT INTO artist_album (id,artist_id,album_id) VALUES (3, 2, 3);
+INSERT INTO artist_album (artist_id,album_id) VALUES (2, 3);
 
-INSERT INTO artist_album (id,artist_id,album_id) VALUES (4, 3, 5);
+INSERT INTO artist_album (artist_id,album_id) VALUES (3, 5);
 

@@ -23,7 +23,7 @@ my $response = JSON::from_json( $mech->content );
 my $expected = {
     'table_info' => {
         'AutoCRUD::DBIC::Track' => {
-            'pk'        => 'id',
+            'pk'        => ['id'],
             'moniker'   => 'Track',
             'col_order' => [
                 'id',          'title',    'length', 'sales',
@@ -44,7 +44,8 @@ my $expected = {
                     'editable'    => 1,
                     'heading'     => 'Album',
                     'is_fk'       => 1,
-                    'masked_col' => 'album_id'
+                    'foreign_col' => ['id'],
+                    'masked_col' => ['album_id']
                 },
                 'sales' => {
                     'required'    => 1,
@@ -59,7 +60,8 @@ my $expected = {
                     'editable'    => 1,
                     'heading'     => 'Copyright',
                     'is_fk'       => 1,
-                    'masked_col' => 'copyright_id'
+                    'foreign_col' => ['id'],
+                    'masked_col' => ['copyright_id']
                 },
                 'title' => {
                     'required' => 1,
@@ -82,7 +84,7 @@ my $expected = {
         },
         'AutoCRUD::DBIC::Copyright' => {
             'mfks'    => { 'tracks' => 'Tracks' },
-            'pk'      => 'id',
+            'pk'      => ['id'],
             'moniker' => 'Copyright',
             'col_order' => [ 'id', 'rights owner', 'copyright_year' ],
             'path'      => 'copyright',
@@ -109,7 +111,7 @@ my $expected = {
         },
         'AutoCRUD::DBIC::Album' => {
             'mfks'      => { 'tracks' => 'Tracks' },
-            'pk'        => 'id',
+            'pk'        => ['id'],
             'moniker'   => 'Album',
             'col_order' => [
                 'id',        'title', 'recorded', 'deleted',
@@ -123,7 +125,7 @@ my $expected = {
                     'heading'     => 'Sleeve Notes',
                     'fk_model'    => 'AutoCRUD::DBIC::SleeveNotes',
                     'is_rr'       => 1,
-                    'foreign_col' => 'album_id'
+                    'foreign_col' => ['album_id']
                 },
                 'artist_id' => {
                     'required'    => 1,
@@ -132,7 +134,8 @@ my $expected = {
                     'editable'    => 1,
                     'heading'     => 'Artist',
                     'is_fk'       => 1,
-                    'masked_col' => 'artist_id'
+                    'foreign_col' => ['id'],
+                    'masked_col' => ['artist_id']
                 },
                 'deleted' => {
                     'required'    => 1,
@@ -174,7 +177,7 @@ my $expected = {
         'AutoCRUD::DBIC::Album'     => 2
     },
     'main' => {
-        'pk'        => 'id',
+        'pk'        => ['id'],
         'moniker'   => 'Track',
         'col_order' => [
             'id',          'title',    'length', 'sales',
@@ -195,7 +198,8 @@ my $expected = {
                 'editable'    => 1,
                 'heading'     => 'Album',
                 'is_fk'       => 1,
-                'masked_col' => 'album_id'
+                'foreign_col' => ['id'],
+                'masked_col' => ['album_id']
             },
             'sales' => {
                 'required'    => 1,
@@ -210,7 +214,8 @@ my $expected = {
                 'editable'    => 1,
                 'heading'     => 'Copyright',
                 'is_fk'       => 1,
-                'masked_col'  => 'copyright_id'
+                'foreign_col'  => ['id'],
+                'masked_col'  => ['copyright_id']
             },
             'title' => {
                 'required' => 1,

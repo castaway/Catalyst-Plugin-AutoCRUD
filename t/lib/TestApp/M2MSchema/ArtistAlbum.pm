@@ -8,25 +8,18 @@ use base 'DBIx::Class';
 __PACKAGE__->load_components("Core");
 __PACKAGE__->table("artist_album");
 __PACKAGE__->add_columns(
-  "id",
-  {
-    data_type => "INTEGER",
-    is_auto_increment => 1,
-    is_nullable => 0,
-    size => undef,
-  },
   "artist_id",
   { data_type => "int", is_foreign_key => 1, is_nullable => 0, size => undef },
   "album_id",
   { data_type => "int", is_foreign_key => 1, is_nullable => 0, size => undef },
 );
-__PACKAGE__->set_primary_key("id");
+__PACKAGE__->set_primary_key("artist_id", "album_id");
 __PACKAGE__->belongs_to(
   "artist_id",
   "TestApp::M2MSchema::Artist",
-  { id => "artist_id" },
+  { "foreign.id" => "self.artist_id" },
 );
-__PACKAGE__->belongs_to("album_id", "TestApp::M2MSchema::Album", { id => "album_id" });
+__PACKAGE__->belongs_to("album_id", "TestApp::M2MSchema::Album", { "foreign.id" => "self.album_id" });
 
 
 # Created by DBIx::Class::Schema::Loader v0.04999_05 @ 2008-09-28 20:13:40

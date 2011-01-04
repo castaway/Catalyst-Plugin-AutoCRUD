@@ -29,7 +29,7 @@ my $expected = {
     'tab_order' => { 'AutoCRUD::DBIC::Album' => 1 },
     'main'      => {
         'mfks'    => { 'artist_albums' => 'Artists' },
-        'pk'      => 'id',
+        'pk'      => ['id'],
         'moniker' => 'Album',
         'col_order' => [ 'id', 'title', 'recorded', 'deleted' ],
         'm2m'   => { 'artist_albums' => 'artist_id' },
@@ -66,7 +66,7 @@ my $expected = {
     'table_info'   => {
         'AutoCRUD::DBIC::Album' => {
             'mfks'    => { 'artist_albums' => 'Artists' },
-            'pk'      => 'id',
+            'pk'      => ['id'],
             'moniker' => 'Album',
             'col_order' => [ 'id', 'title', 'recorded', 'deleted' ],
             'm2m'   => { 'artist_albums' => 'artist_id' },

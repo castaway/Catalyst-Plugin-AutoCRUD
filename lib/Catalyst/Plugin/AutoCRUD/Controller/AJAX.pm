@@ -108,7 +108,8 @@ sub base : Chained('/autocrud/root/call') PathPart('') CaptureArgs(0) {
 
     my $page   = $c->req->params->{'page'}  || 1;
     my $limit  = $c->req->params->{'limit'} || 10;
-    my $sortby = $c->req->params->{'sort'}  || $c->stash->{lf}->{main}->{pk};
+#    my $sortby = $c->req->params->{'sort'}  || $c->stash->{lf}->{main}->{pk};
+    my $sortby = $c->req->params->{'sort'}  || $c->stash->{lf}->{main}->{pk}->[0];
     (my $dir   = $c->req->params->{'dir'}   || 'ASC') =~ s/\s//g;
 
     @{$c->stash}{qw/ page limit sortby dir /}
@@ -167,7 +168,10 @@ sub list : Chained('base') Args(0) {
     #}
 
     # sanity check the sort param
-    $sort = $info->{pk} if $sort !~ m/^[\w ]+$/ or !exists $info->{cols}->{$sort};
+    ## Not sure if sort can contain multiple col values
+    ## Is being treated as a colname in lots of places though.
+#    $sort = $info->{pk} if $sort !~ m/^[\w ]+$/ or !exists $info->{cols}->{$sort};
+    $sort = $info->{pk}->[0] if $sort !~ m/^[\w ]+$/ or !exists $info->{cols}->{$sort};
 
     # before setting up the paging and sorting, we need to check whether
     # the FK params are legit PK vals in the related schema
@@ -197,11 +201,18 @@ sub list : Chained('base') Args(0) {
             next;
         }
 
+        ## This seems to only work if the rel-name of the belongs_to rel
+        ## matches the local column name:
+        ## Changed in metadata to store each matching fk col to each local col
+        ## in case of multi-col keys
         if ($info->{cols}->{$col}->{is_rr}) {
             next if !exists $info->{cols}->{$col}->{foreign_col};
-            my $foreign_col = $info->{cols}->{$col}->{foreign_col};
+            my $foreign_cols = $info->{cols}->{$col}->{foreign_col};
             push @{$search_opts->{join}}, $col;
-            $filter->{"$col.$foreign_col"} = $c->req->params->{"search.$col"};
+            if(scalar @$foreign_cols == 1) {
+                my $foreign_col = $foreign_cols->[0];
+                $filter->{"$col.$foreign_col"} = $c->req->params->{"search.$col"};
+            }
             next;
         }
 
@@ -230,7 +241,7 @@ sub list : Chained('base') Args(0) {
     # sort col which can be passed to the db
     if ($dir =~ m/^(?:ASC|DESC)$/ and !exists $delay_page_sort{$sort}
         and not ($info->{cols}->{$sort}->{is_fk} or $info->{cols}->{$sort}->{is_rr})) {
-        $search_opts->{order_by} = \"me.$sort $dir";
+        $search_opts->{order_by} = \"me.$sort $dir";  #"
     }
 
     # set up pager, if needed (if user filtering by FK then delay paging)
@@ -239,8 +250,8 @@ sub list : Chained('base') Args(0) {
         $search_opts->{rows} = $limit;
     }
 
-    #use Data::Dumper;
-    #$c->log->debug( Dumper [$filter, $search_opts] );
+#    use Data::Dumper;
+#    $c->log->debug( Dumper [$filter, $search_opts] );
 
     my $rs = $c->model($lf->{model})->search($filter, $search_opts);
     my @columns = keys %{ $info->{cols} };
@@ -358,10 +369,10 @@ sub update : Chained('base') Args(0) {
     my $response = $c->stash->{json_data} = {};
 
     my $stack = _build_table_data($c, [], $lf->{model});
-    #if ($c->debug) {
-    #    use Data::Dumper;
-    #    $c->log->debug(Dumper {table_stack => $stack});
-    #}
+    if ($c->debug) {
+        use Data::Dumper;
+        $c->log->debug(Dumper {table_stack => $stack});
+    }
 
     # stack is processed in one transaction, so either all rows are
     # updated, or none, and an error thrown.
@@ -373,10 +384,10 @@ sub update : Chained('base') Args(0) {
             \&_process_row_stack, $c, $stack
         );
     };
-    #if ($c->debug) {
-    #    use Data::Dumper;
-    #    $c->log->debug(Dumper {success => $success, exception => $@});
-    #}
+    if ($c->debug) {
+        use Data::Dumper;
+        $c->log->debug(Dumper {success => $success, exception => $@});
+    }
     $response->{'success'} = (($success && !$@) ? 1 : 0);
 
     #$c->model($lf->{model})->result_source->storage->debug(0)
@@ -422,8 +433,13 @@ sub _build_table_data {
             # okay, no full row for related table, maybe just an ID update?
             if ($params->{ "combobox.$col" } and ($model eq $lf->{model})) {
                 my $pk = $lf->{main}->{pk};
-                if (exists $params->{ $pk } and $params->{ $pk } ne '') {
-                    my $this_row = eval { $c->model($lf->{model})->find( $params->{ $pk } ) };
+#                if (exists $params->{ $pk } and $params->{ $pk } ne '') {
+                my $got_pk = 1;
+                foreach my $pk (@$pk) {
+                    $got_pk = 0 if(!exists $params->{ $pk } || $params->{ $pk } eq '');
+                }
+                if ($got_pk) {
+                    my $this_row = eval { $c->model($lf->{model})->find( map { $params->{ $_ } }  @$pk ) };
 
                     # skip where the FK val isn't really an update
                     next if (blessed $this_row)
@@ -437,8 +453,8 @@ sub _build_table_data {
 
             # rename col to real name, now we have data for it
             # (custom relation accessor name)
-            $data->{ $ci->{masked_col} } = delete $data->{$col}
-                if defined $data->{$col} and exists $ci->{masked_col};
+            $data->{ $ci->{masked_col}[0] } = delete $data->{$col}
+                if defined $data->{$col} and exists $ci->{masked_col} and scalar @{ $ci->{masked_col} } == 1;
         }
         else {
         # not a foreign key, so just update the row data
@@ -497,25 +513,42 @@ sub _process_row_stack {
         last if !defined $model;
 
         # fetch and include PK vals from previously inserted rows
+
         my $info = $lf->{table_info}->{$model};
         foreach my $col (keys %{$info->{cols}}) {
             my $ci = $info->{cols}->{$col};
             next unless $ci->{is_fk} and exists $stashed_keys{$ci->{fk_model}};
-            $col = $ci->{masked_col} if exists $ci->{masked_col};
-            $data->{$col} = $stashed_keys{$ci->{fk_model}};
+            my $masked_col = $ci->{masked_col} if exists $ci->{masked_col};
+#            $data->{$col} = $stashed_keys{$ci->{fk_model}};
+            foreach my $ind (0..$#$masked_col) {
+                $data->{$masked_col->[$ind]} = $stashed_keys{$ci->{fk_model}}{$ci->{foreign_col}[$ind]};
+            }
+#            $data->{$_} = $stashed_keys{$ci->{fk_model}}{$_} for @$masked_col;
         }
 
         # update or create the row; could this use a magic DBIC method?
         my $pk = $lf->{table_info}->{$model}->{pk};
-        my $row = (( defined $data->{ $pk } )
-            ? eval { $c->model($model)->find( $data->{ $pk } ) }
+#        $c->log->_dump(["Data1: ", $data]);
+        my $has_pk = 1;
+        foreach my $pk_col (@$pk) {
+            $has_pk = 0 if(!defined $data->{$pk_col});
+        }
+        my $row = ($has_pk
+            ? eval { $c->model($model)->find( map { $data->{ $_ } } @$pk ) }
             : undef );
+#        $c->log->_dump(["Data: ", $data]);
+#        $c->log->_dump(["Tried to find: ", [map { $data->{ $_ } } @$pk]]);;
+#        $c->log->_dump("Error: $@") if($@);
+
         $row = (( blessed $row )
             ? $row->set_columns( $data )
             : $c->model($model)->new_result( $data ) );
 
         $row->update_or_insert;
-        $stashed_keys{$model} = $row->id;
+#        $stashed_keys{$model} = $row->id;
+        # hashref of key/vals for PK, see DBIx::Class::PK
+        $stashed_keys{$model} = $row->ident_condition;
+#        $c->log->_dump(["Inserted row, ident", $stashed_keys{$model}]);
     }
     
     return 1;
