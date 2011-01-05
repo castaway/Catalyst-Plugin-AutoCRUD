@@ -81,7 +81,32 @@ my $default_artist_page = {
     ]
 };
 
+my $default_m2m_page = {
+          'rows' => [
+                      {
+                        'album_id' => 'Album: id(1)',
+                        'artist_id' => 'Artist: id(1)'
+                      },
+                      {
+                        'album_id' => 'Album: id(2)',
+                        'artist_id' => 'Artist: id(1)'
+                      },
+                      {
+                        'album_id' => 'Album: id(3)',
+                        'artist_id' => 'Artist: id(2)'
+                      },
+                      {
+                        'album_id' => 'Album: id(5)',
+                        'artist_id' => 'Artist: id(3)'
+                      }
+                    ],
+          'total' => 4
+        };
+
+
 $mech->ajax_ok( '/site/default/schema/dbic/source/album/list', {}, $default_album_page, 'album no args' );
 $mech->ajax_ok( '/site/default/schema/dbic/source/artist/list', {}, $default_artist_page, 'artist no args' );
+
+$mech->ajax_ok( '/site/default/schema/dbic/source/artist_album/list', {}, $default_m2m_page, 'artist_album no args' );
 
 __END__

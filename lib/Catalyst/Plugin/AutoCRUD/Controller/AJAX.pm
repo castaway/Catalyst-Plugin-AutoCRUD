@@ -439,7 +439,9 @@ sub _build_table_data {
                     $got_pk = 0 if(!exists $params->{ $pk } || $params->{ $pk } eq '');
                 }
                 if ($got_pk) {
-                    my $this_row = eval { $c->model($lf->{model})->find( map { $params->{ $_ } }  @$pk ) };
+                    my $this_row = eval { $c->model($lf->{model})->find({ 
+                        map { $_ => $params->{ $_ } }  @$pk 
+                                                                        }) };
 
                     # skip where the FK val isn't really an update
                     next if (blessed $this_row)
@@ -534,7 +536,7 @@ sub _process_row_stack {
             $has_pk = 0 if(!defined $data->{$pk_col});
         }
         my $row = ($has_pk
-            ? eval { $c->model($model)->find( map { $data->{ $_ } } @$pk ) }
+            ? eval { $c->model($model)->find({ map { $_ => $data->{ $_ } } @$pk }) }
             : undef );
 #        $c->log->_dump(["Data: ", $data]);
 #        $c->log->_dump(["Tried to find: ", [map { $data->{ $_ } } @$pk]]);;
